@@ -1,0 +1,9 @@
+/* ELF export list for kcore.node: only the Node-API entry points. kcore.h gives the statically linked
+ * kcore_* functions default visibility, so without this the addon would re-export them. */
+{
+    global:
+        napi_register_module_v1;
+        node_api_module_get_api_version_v1;
+    local:
+        *;
+};

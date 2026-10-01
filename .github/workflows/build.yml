@@ -1,0 +1,231 @@
+# Builds and tests the npm package; called by ci.yml (every push) and publish.yml (tags, dry runs).
+#
+#   prebuilds        linux-{x64,arm64}-{gnu,musl} and windows-x64 kcore.node with zig 0.16.0, plus
+#                    kcore.wasm, all from the sha256-pinned kcore Release packages
+#   prebuild-darwin  darwin-universal kcore.node with Xcode clang (arm64 + x86_64, minos 11.0)
+#   pack             npm pack; the tarball must hold exactly the shipped files
+#   test             the packed tarball installed and tested on each platform it targets
+#
+# Every job here is read-only: the caller's id-token never reaches the jobs that install dev
+# dependencies. Installs are script-free and cooldown-gated (ChainDrop response, 2026-08).
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # Matches ziglang.org/download/index.json 0.16.0 x86_64-linux shasum (KnishIO-Crypto-Core build.yml).
+  ZIG_URL: https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+  ZIG_SHA256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+
+jobs:
+  prebuilds:
+    name: prebuilds
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install zig 0.16.0 (sha256-pinned)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/zig.tar.xz" "$ZIG_URL"
+          echo "$ZIG_SHA256  $RUNNER_TEMP/zig.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          # No lockfile is committed, so there is nothing to cache against.
+          package-manager-cache: false
+
+      # Script-free resolve that refuses versions younger than 7 days, then a locked install with
+      # lifecycle scripts disabled (node-api-headers is the only build-time dependency).
+      - name: Resolve dependencies (script-free, 7-day cooldown)
+        run: npm install --package-lock-only --ignore-scripts --before="$(node -p 'new Date(Date.now() - 7 * 864e5).toISOString()')"
+
+      - name: Install dependencies (locked, no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Fetch kcore (sha256-pinned Release packages)
+        run: node scripts/fetch-kcore.mjs linux-x64-gnu linux-arm64-gnu linux-x64-musl linux-arm64-musl windows-x64 wasm32
+
+      - name: Build the addons
+        run: |
+          set -euo pipefail
+          for t in linux-x64-gnu linux-arm64-gnu linux-x64-musl linux-arm64-musl windows-x64; do
+            bash scripts/build-addon.sh "$t"
+          done
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: prebuilds-zig
+          path: |
+            prebuilds/
+            kcore.wasm
+          if-no-files-found: error
+
+  prebuild-darwin:
+    name: prebuild-darwin
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Resolve dependencies (script-free, 7-day cooldown)
+        run: npm install --package-lock-only --ignore-scripts --before="$(node -p 'new Date(Date.now() - 7 * 864e5).toISOString()')"
+
+      - name: Install dependencies (locked, no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Fetch kcore (sha256-pinned Release package)
+        run: node scripts/fetch-kcore.mjs darwin-universal
+
+      - name: Build the addon and check minos
+        run: |
+          set -euo pipefail
+          bash scripts/build-addon.sh darwin-universal
+          for a in arm64 x86_64; do
+            m=$(otool -arch "$a" -l prebuilds/darwin-universal/kcore.node | awk '/LC_BUILD_VERSION/ { f = 1 } f && /minos/ { print $2; exit }')
+            echo "$a minos $m"
+            [ "$m" = 11.0 ] || { echo "::error::$a slice minos is '$m', expected 11.0"; exit 1; }
+          done
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: prebuilds-darwin
+          path: prebuilds/
+          if-no-files-found: error
+
+  pack:
+    name: pack
+    needs: [prebuilds, prebuild-darwin]
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: prebuilds-zig
+          path: .
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: prebuilds-darwin
+          path: prebuilds
+
+      - name: npm pack and check its contents
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts
+          node scripts/check-pack.mjs "wishknish-knishio-kcore-$VERSION.tgz"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: npm-tarball
+          path: wishknish-knishio-kcore-*.tgz
+          if-no-files-found: error
+
+  test:
+    name: test (${{ matrix.name }})
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64-gnu node 20, runner: ubuntu-24.04, node: '20', expect: napi }
+          - { name: linux-x64-gnu node 22, runner: ubuntu-24.04, node: '22', expect: napi }
+          - { name: linux-x64-gnu node 24, runner: ubuntu-24.04, node: '24', expect: napi }
+          - { name: linux-x64-gnu wasm, runner: ubuntu-24.04, node: '24', expect: wasm, backend: wasm }
+          - { name: linux-x64-musl, runner: ubuntu-24.04, container: 'node:24-alpine', expect: napi }
+          - { name: linux-arm64-gnu, runner: ubuntu-24.04-arm, node: '24', expect: napi }
+          - { name: linux-arm64-musl, runner: ubuntu-24.04-arm, container: 'node:24-alpine', expect: napi }
+          - { name: darwin arm64, runner: macos-15, node: '24', expect: napi }
+          - { name: darwin x64, runner: macos-15-intel, node: '24', expect: napi }
+          - { name: windows-x64, runner: windows-2025, node: '24', expect: napi }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ inputs.version }}
+      EXPECT: ${{ matrix.expect }}
+      CONTAINER: ${{ matrix.container }}
+      KNISHIO_KCORE_BACKEND: ${{ matrix.backend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node ${{ matrix.node }}
+        if: matrix.container == ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: npm-tarball
+          path: dist
+
+      - name: Install the tarball and run the tests
+        run: |
+          set -euo pipefail
+          T="dist/wishknish-knishio-kcore-$VERSION.tgz"
+          if [ -n "$CONTAINER" ]; then
+            docker run --rm -v "$PWD:/w" -w /w -e KNISHIO_KCORE_BACKEND "$CONTAINER" \
+              sh scripts/run-installed-tests.sh "$T" "$EXPECT"
+          else
+            sh scripts/run-installed-tests.sh "$T" "$EXPECT"
+          fi
+
+      # The Windows addon imports napi_* from NODE.EXE (node-api-headers' node_api.def). In a host
+      # executable with another name the addon cannot load, and `auto` must fall back to WASM.
+      # Two variants: PATH stripped of every directory holding a node.exe (the import cannot
+      # resolve at all), and the full PATH (Windows may find a second node.exe there and bind the
+      # addon to an uninitialised copy). A crash in either is a finding, not a flake: the fix is a
+      # delay-load hook that rebinds to the host process, never a looser expectation here.
+      - name: Renamed node.exe falls back to WASM
+        if: matrix.runner == 'windows-2025'
+        run: |
+          set -euo pipefail
+          cd "$(cygpath -u "$RUNNER_TEMP")/kcore-pkg-test"
+          cp "$(command -v node)" n2.exe
+          stripped=
+          IFS=: read -r -a dirs <<< "$PATH"
+          for d in "${dirs[@]}"; do
+            [ -e "$d/node.exe" ] || stripped="${stripped:+$stripped:}$d"
+          done
+          if PATH="$stripped" command -v node.exe; then echo "::error::node.exe still on the stripped PATH"; exit 1; fi
+          echo "--- PATH without node.exe"
+          PATH="$stripped" KNISHIO_KCORE_EXPECT_BACKEND=wasm ./n2.exe --test test/kcore.test.mjs
+          echo "--- full PATH"
+          KNISHIO_KCORE_EXPECT_BACKEND=wasm ./n2.exe --test test/kcore.test.mjs

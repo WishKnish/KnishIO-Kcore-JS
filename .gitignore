@@ -1,0 +1,7 @@
+node_modules/
+vendor/
+prebuilds/
+kcore.wasm
+build/
+*.tgz
+package-lock.json

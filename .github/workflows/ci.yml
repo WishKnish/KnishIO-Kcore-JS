@@ -1,0 +1,69 @@
+# CI for @wishknish/knishio-kcore: version gate, CHANGELOG gate, and the full build/pack/test matrix
+# (build.yml) on every push and pull request.
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  # Catch version drift at commit time, not at release time. Same script as the publish gate, no
+  # expected version: assert only that the repo agrees with itself.
+  version:
+    name: version consistency
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Declared versions agree
+        id: check
+        run: bash .github/scripts/check-version.sh
+
+  changelog:
+    name: changelog entry for version bump
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 — the gate diffs against the base commit, which a shallow checkout would not
+      # have. persist-credentials: false — the diff reads local objects only.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # If package.json's version changed relative to the base commit, CHANGELOG.md must carry a
+      # matching `## [<version>]` heading. No version change → no-op.
+      # Convention: docs/SDK-RELEASE-CONVENTIONS.md in the KnishIOClientSDK monorepo.
+      - name: CHANGELOG entry for the manifest version bump
+        # BASE arrives via env, never interpolated into the shell text (workflow-injection hygiene).
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -eu
+          BASE="${BASE:-}"
+          if [ -z "$BASE" ] || [ "$BASE" = '0000000000000000000000000000000000000000' ] \
+             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No comparable base commit — changelog gate skipped."; exit 0
+          fi
+          ver() { sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+          git show "$BASE:package.json" > /tmp/base-manifest 2>/dev/null || : > /tmp/base-manifest
+          NEW=$(ver package.json); OLD=$(ver /tmp/base-manifest)
+          if [ "$NEW" = "$OLD" ]; then echo "version unchanged ($NEW) — nothing to check."; exit 0; fi
+          echo "version bumped: ${OLD:-<none>} -> $NEW"
+          # index()==1 is a fixed-string match anchored at column 1: a deeper `### [x]` heading does
+          # NOT satisfy `## [x]`.
+          if ! awk -v h="## [$NEW]" 'index($0, h) == 1 { f = 1 } END { exit !f }' CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::Version bumped to $NEW but CHANGELOG.md has no '## [$NEW]' entry."
+            exit 1
+          fi
+          echo "OK: CHANGELOG.md documents $NEW"
+
+  build:
+    name: build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}

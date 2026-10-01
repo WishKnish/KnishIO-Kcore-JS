@@ -1,0 +1,42 @@
+{
+  "name": "@wishknish/knishio-kcore",
+  "version": "0.1.0",
+  "description": "Node binding of kcore, the KnishIO shared crypto core (SHAKE256, WOTS+, ML-KEM-1024/768): N-API prebuilds with a WebAssembly fallback.",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WishKnish/KnishIO-Kcore-JS.git"
+  },
+  "type": "commonjs",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "require": "./index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "index.cjs",
+    "index.mjs",
+    "index.d.ts",
+    "kcore.wasm",
+    "prebuilds/",
+    "LICENSE",
+    "LICENSE-mlkem-native",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test test/kcore.test.mjs"
+  },
+  "devDependencies": {
+    "@noble/post-quantum": "0.7.1",
+    "node-api-headers": "1.9.0"
+  }
+}

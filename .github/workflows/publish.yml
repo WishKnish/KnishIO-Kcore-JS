@@ -1,0 +1,131 @@
+# Publish @wishknish/knishio-kcore — tag-driven npm publish via Trusted Publishing / OIDC.
+# Push a bare version tag (e.g. `0.1.0`, via scripts/release-sdk.sh kcore-js <version> --push in the
+# KnishIOClientSDK workspace) → version gate → build/pack/test matrix → `npm publish` of the tested
+# tarball → GitHub Release.
+#
+# Auth = npm Trusted Publishing (OIDC) — NO long-lived NPM_TOKEN. One-time maintainer setup:
+#   npmjs.com → @wishknish/knishio-kcore → Settings → Trusted Publisher → GitHub Actions:
+#   organization `WishKnish`, repository `KnishIO-Kcore-JS`, workflow `publish.yml`, environment
+#   `release`. (All fields case-sensitive; npm validates them only at publish time.)
+# Requires npm >= 11.5.1 + Node >= 22.14 (Node 24 + `npm install -g npm@latest`). Provenance
+# attestations are generated automatically under trusted publishing.
+name: Publish
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+  # Dry run: the version gate and the full build/pack/test matrix, then stop — the publish job is
+  # guarded on `github.event_name == 'push'`.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version to dry-run the gate against, e.g. 0.1.0. Publishes NOTHING.'
+        required: true
+        type: string
+
+permissions:
+  id-token: write   # OIDC for npm Trusted Publishing (publish job only; build.yml drops to read)
+  contents: write   # create the GitHub Release
+
+jobs:
+  verify:
+    name: verify tag matches package version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # DISPATCH_TAG arrives via env, never interpolated into the shell text (workflow-injection hygiene).
+      - name: Verify tag matches the declared package version
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ]; then
+            EXPECTED="${GITHUB_REF#refs/tags/}"
+          else
+            EXPECTED="$DISPATCH_TAG"
+          fi
+          bash .github/scripts/check-version.sh "$EXPECTED"
+
+  build:
+    name: build
+    needs: verify
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.verify.outputs.version }}
+
+  publish:
+    name: publish to npm (Trusted Publishing)
+    needs: [verify, build]
+    if: github.event_name == 'push'   # dispatch = dry run; never publishes
+    runs-on: ubuntu-latest
+    environment: release   # matches the npm trusted-publisher Environment + the repo's `release` env
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted publishing needs npm >= 11.5.1 (newer than the bundled npm).
+      - name: Upgrade npm (>= 11.5.1 for trusted publishing)
+        run: npm install -g npm@latest
+
+      # The exact tarball the test matrix installed. This job holds `id-token: write` and installs
+      # NO dependencies, so no third-party npm script ever runs next to the OIDC token.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: npm-tarball
+          path: dist
+
+      # Release body = this tag's CHANGELOG.md section, NOT generate_release_notes. Runs BEFORE
+      # `npm publish` so a missing section aborts ahead of the irreversible upload.
+      - name: Extract this tag's CHANGELOG section
+        run: |
+          set -euo pipefail
+          awk -v ver="## [$VERSION]" '
+            index($0, ver) == 1 { inside = 1; print; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "::error file=CHANGELOG.md::No '## [$VERSION]' section found — refusing to publish with empty release notes."
+            exit 1
+          fi
+          echo "Release notes for $VERSION:"
+          cat /tmp/release-notes.md
+
+      # The first publish of a new package is manual (npm trusted publishing needs the package to
+      # exist already), so the tag push that follows must not try to upload the same version again.
+      # Skip the upload when this version is on npm; the GitHub Release step still runs.
+      - name: Skip if this version is already on npm
+        id: published
+        run: |
+          if npm view "@wishknish/knishio-kcore@$VERSION" version >/dev/null 2>&1; then echo "already=true" >> "$GITHUB_OUTPUT"; else echo "already=false" >> "$GITHUB_OUTPUT"; fi
+
+      # OIDC trusted publishing: no NODE_AUTH_TOKEN; npm authenticates via the id-token and
+      # auto-generates provenance. --access public keeps the scoped package public.
+      - name: Publish to npm (Trusted Publishing)
+        if: steps.published.outputs.already != 'true'
+        run: npm publish "dist/wishknish-knishio-kcore-$VERSION.tgz" --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
+        with:
+          # generate_release_notes stays OFF: the curated CHANGELOG section is the release body.
+          body_path: /tmp/release-notes.md
+          files: dist/wishknish-knishio-kcore-*.tgz

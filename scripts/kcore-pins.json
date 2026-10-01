@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "url": "https://github.com/WishKnish/KnishIO-Crypto-Core/releases/download/{version}/knishio-crypto-core-{version}-{target}.tar.gz",
+  "targets": {
+    "linux-x64-gnu":    {"sha256": "57a3187c136cccbd64ed7dc7561745f9edba2697f42f9f5b47c4f66f1d0823b0", "member": "lib/libkcore.a"},
+    "linux-arm64-gnu":  {"sha256": "c4f470f50db949c026abd032a597513699947750d64d05b3f5cc9fc7916f97b2", "member": "lib/libkcore.a"},
+    "linux-x64-musl":   {"sha256": "1efdc119757aa2a73e6f07871f197a06ef49fa49730d7a30ed06e1e18623cdbe", "member": "lib/libkcore.a"},
+    "linux-arm64-musl": {"sha256": "a34596db8008ac89eadf3a8ab8270089c1cef8f19c76eb4e46f38a99e7d593db", "member": "lib/libkcore.a"},
+    "darwin-universal": {"sha256": "e75e4a9f24472f9602e41984b5f0b5c6d387284b6ca8bb1b116481b96fd7b950", "member": "lib/libkcore.a"},
+    "windows-x64":      {"sha256": "5fd14237bfd9375830edd50dae1ac28d07634fc3013d84cc2c3dcc250b382d08", "member": "lib/libkcore_static.a"},
+    "wasm32":           {"sha256": "57c0360292995e56cf20a972ec29ac8e97cf4c8f7c6028420aba8aa1bf233ed3", "member": "kcore.wasm"}
+  }
+}
