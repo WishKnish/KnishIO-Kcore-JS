@@ -207,13 +207,12 @@ jobs:
             sh scripts/run-installed-tests.sh "$T" "$EXPECT"
           fi
 
-      # The Windows addon imports napi_* from NODE.EXE (node-api-headers' node_api.def). In a host
-      # executable with another name the addon cannot load, and `auto` must fall back to WASM.
-      # Two variants: PATH stripped of every directory holding a node.exe (the import cannot
-      # resolve at all), and the full PATH (Windows may find a second node.exe there and bind the
-      # addon to an uninitialised copy). A crash in either is a finding, not a flake: the fix is a
-      # delay-load hook that rebinds to the host process, never a looser expectation here.
-      - name: Renamed node.exe falls back to WASM
+      # The Windows addon imports nothing from NODE.EXE: src/kcore_napi.c resolves napi_* from the
+      # host process at load, so a host executable with another name (Electron, pkg, a renamed
+      # node.exe) must load the napi backend too. Two variants: PATH stripped of every directory
+      # holding a node.exe, and the full PATH (where an import of NODE.EXE would bind the addon to
+      # a second, uninitialised node.exe and crash). Anything but napi in either is a finding.
+      - name: Renamed node.exe loads the napi backend
         if: matrix.runner == 'windows-2025'
         run: |
           set -euo pipefail
@@ -226,6 +225,6 @@ jobs:
           done
           if PATH="$stripped" command -v node.exe; then echo "::error::node.exe still on the stripped PATH"; exit 1; fi
           echo "--- PATH without node.exe"
-          PATH="$stripped" KNISHIO_KCORE_EXPECT_BACKEND=wasm ./n2.exe --test test/kcore.test.mjs
+          PATH="$stripped" KNISHIO_KCORE_EXPECT_BACKEND=napi ./n2.exe --test test/kcore.test.mjs
           echo "--- full PATH"
-          KNISHIO_KCORE_EXPECT_BACKEND=wasm ./n2.exe --test test/kcore.test.mjs
+          KNISHIO_KCORE_EXPECT_BACKEND=napi ./n2.exe --test test/kcore.test.mjs

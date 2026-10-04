@@ -2,10 +2,11 @@
 # build-addon.sh <target>
 #
 # Builds prebuilds/<target>/kcore.node from src/kcore_napi.c, statically linked against the kcore
-# static library that scripts/fetch-kcore.mjs put in vendor/<target>/. Node-API headers (and the
-# Windows import definitions) come from the pinned node-api-headers devDependency.
+# static library that scripts/fetch-kcore.mjs put in vendor/<target>/. Node-API headers come from the
+# pinned node-api-headers devDependency.
 #   linux-*            zig 0.16.0, the same targets and -mcpu as KnishIO-Crypto-Core's toolchains
-#   windows-x64        zig 0.16.0 (x86_64-windows-gnu); node.exe import library from node_api.def
+#   windows-x64        zig 0.16.0 (x86_64-windows-gnu); no node.exe import library: napi_* resolve at
+#                      load from the host process (src/kcore_napi.c), so renamed hosts work
 #   darwin-universal   Xcode clang, arm64 + x86_64, macOS >= 11 (macOS hosts only)
 # Only the Node-API entry points are exported: kcore.h gives kcore_* default visibility, so the static
 # library's symbols are hidden explicitly (src/addon.map on ELF, -exported_symbol on Mach-O).
@@ -39,9 +40,8 @@ linux-arm64-gnu) zig_linux aarch64-linux-gnu.2.17 cortex_a72 ;;
 linux-x64-musl) zig_linux x86_64-linux-musl x86_64 ;;
 linux-arm64-musl) zig_linux aarch64-linux-musl cortex_a72 ;;
 windows-x64)
-    zig dlltool -d "$headers/def/node_api.def" -l build/node_api.lib -m i386:x86-64
     zig cc -target x86_64-windows-gnu -mcpu=x86_64 -shared -s -DKCORE_STATIC "${cflags[@]}" \
-        src/kcore_napi.c vendor/windows-x64/lib/libkcore_static.a build/node_api.lib -o "$out"
+        src/kcore_napi.c vendor/windows-x64/lib/libkcore_static.a -o "$out"
     # zig also writes import libraries next to the DLL; the package ships only the .node.
     rm -f "prebuilds/$target"/*.lib "prebuilds/$target"/*.pdb
     ;;

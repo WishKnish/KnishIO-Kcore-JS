@@ -21,6 +21,52 @@
 
 #include "kcore.h"
 
+#ifdef _WIN32
+/* On Windows the addon imports nothing from a DLL named NODE.EXE. Such an import breaks in a host
+ * executable with another name (Electron, pkg, a renamed node.exe): Windows resolves it by searching
+ * for node.exe, may load a second, uninitialised copy from PATH, and the addon then calls into that
+ * copy. Instead every napi_* entry point the addon uses is resolved once, at module init, from the
+ * host process itself (GetModuleHandle(NULL)), which is the executable that loaded the addon and
+ * exports Node-API. If the host does not export them, init returns NULL and the package falls back
+ * to its WASM backend. The build links no node.exe import library, so a napi_* call that bypassed
+ * this table would fail to link. */
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#define KN_NAPI_FNS(X)                                                                         \
+    X(napi_create_array_with_length) X(napi_create_buffer) X(napi_create_int32)                 \
+    X(napi_define_properties) X(napi_get_cb_info) X(napi_get_typedarray_info)                    \
+    X(napi_get_value_int32) X(napi_get_value_int64) X(napi_is_typedarray) X(napi_set_element)    \
+    X(napi_throw_error) X(napi_throw_range_error) X(napi_throw_type_error)
+
+#define KN_PTR(f) static __typeof__(f) *kn_##f;
+KN_NAPI_FNS(KN_PTR)
+
+/* 0 when every entry point resolved from the host executable. */
+static int kn_resolve_host(void) {
+    HMODULE host = GetModuleHandleW(NULL);
+    if (host == NULL) return -1;
+#define KN_GET(f) \
+    if ((kn_##f = (__typeof__(f) *)(void (*)(void))GetProcAddress(host, #f)) == NULL) return -1;
+    KN_NAPI_FNS(KN_GET)
+    return 0;
+}
+
+#define napi_create_array_with_length (*kn_napi_create_array_with_length)
+#define napi_create_buffer (*kn_napi_create_buffer)
+#define napi_create_int32 (*kn_napi_create_int32)
+#define napi_define_properties (*kn_napi_define_properties)
+#define napi_get_cb_info (*kn_napi_get_cb_info)
+#define napi_get_typedarray_info (*kn_napi_get_typedarray_info)
+#define napi_get_value_int32 (*kn_napi_get_value_int32)
+#define napi_get_value_int64 (*kn_napi_get_value_int64)
+#define napi_is_typedarray (*kn_napi_is_typedarray)
+#define napi_set_element (*kn_napi_set_element)
+#define napi_throw_error (*kn_napi_throw_error)
+#define napi_throw_range_error (*kn_napi_throw_range_error)
+#define napi_throw_type_error (*kn_napi_throw_type_error)
+#endif
+
 #define BAD_ARG(env, msg) do { napi_throw_type_error((env), "KCORE_BAD_ARG", (msg)); return NULL; } while (0)
 #define REJECTED(env, fn) do { napi_throw_error((env), "KCORE_REJECTED", fn " rejected its arguments"); return NULL; } while (0)
 
@@ -189,6 +235,9 @@ static napi_value js_mlkem_decaps(napi_env env, napi_callback_info info) {
 }
 
 NAPI_MODULE_INIT() {
+#ifdef _WIN32
+    if (kn_resolve_host() != 0) return NULL;
+#endif
     napi_property_descriptor props[] = {
         {"abiVersion", NULL, js_abi_version, NULL, NULL, NULL, napi_default, NULL},
         {"shake256", NULL, js_shake256, NULL, NULL, NULL, napi_default, NULL},
