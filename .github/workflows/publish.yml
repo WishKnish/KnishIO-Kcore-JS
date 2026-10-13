@@ -7,7 +7,7 @@
 #   npmjs.com → @wishknish/knishio-kcore → Settings → Trusted Publisher → GitHub Actions:
 #   organization `WishKnish`, repository `KnishIO-Kcore-JS`, workflow `publish.yml`, environment
 #   `release`. (All fields case-sensitive; npm validates them only at publish time.)
-# Requires npm >= 11.5.1 + Node >= 22.14 (Node 24 + `npm install -g npm@latest`). Provenance
+# Requires npm >= 11.5.1 + Node >= 22.14 (Node 24 + npm 11.21.0, pinned). Provenance
 # attestations are generated automatically under trusted publishing.
 name: Publish
 
@@ -81,9 +81,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
-      # Trusted publishing needs npm >= 11.5.1 (newer than the bundled npm).
-      - name: Upgrade npm (>= 11.5.1 for trusted publishing)
-        run: npm install -g npm@latest
+      # Trusted publishing needs npm >= 11.5.1 (newer than the bundled npm). Pinned, not @latest:
+      # a new npm major can change how `npm publish <spec>` parses its argument.
+      - name: Install npm 11.21.0 (>= 11.5.1 for trusted publishing)
+        run: npm install -g npm@11.21.0
 
       # The exact tarball the test matrix installed. This job holds `id-token: write` and installs
       # NO dependencies, so no third-party npm script ever runs next to the OIDC token.
@@ -118,10 +119,11 @@ jobs:
           if npm view "@wishknish/knishio-kcore@$VERSION" version >/dev/null 2>&1; then echo "already=true" >> "$GITHUB_OUTPUT"; else echo "already=false" >> "$GITHUB_OUTPUT"; fi
 
       # OIDC trusted publishing: no NODE_AUTH_TOKEN; npm authenticates via the id-token and
-      # auto-generates provenance. --access public keeps the scoped package public.
+      # auto-generates provenance. --access public keeps the scoped package public. The `./`
+      # prefix makes npm read the argument as a local file path, never as a GitHub shorthand.
       - name: Publish to npm (Trusted Publishing)
         if: steps.published.outputs.already != 'true'
-        run: npm publish "dist/wishknish-knishio-kcore-$VERSION.tgz" --access public
+        run: npm publish "./dist/wishknish-knishio-kcore-$VERSION.tgz" --access public
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
