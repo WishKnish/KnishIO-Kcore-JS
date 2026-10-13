@@ -10,6 +10,7 @@
  *   shake256(in, outLen) -> Buffer
  *   chainsHex(asciiChunks, Int32Array counts) -> Buffer (a new copy; 4-way Keccak)
  *   wotsAddress(asciiKey2048) -> Buffer (64 hex bytes)
+ *   wotsAddressV2(asciiKey8192) -> Buffer (64 hex bytes)
  *   mlkemKeypair(set, seed64) -> [pk, sk]
  *   mlkemEncaps(set, pk, coins32) -> [ct, ss]
  *   mlkemDecaps(set, ct, sk) -> ss
@@ -182,6 +183,21 @@ static napi_value js_wots_address(napi_env env, napi_callback_info info) {
     return res;
 }
 
+static napi_value js_wots_address_v2(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value argv[1];
+    uint8_t *key, *out;
+    size_t klen;
+    napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+    if (argc != 1 || get_u8(env, argv[0], &key, &klen) != 0 || klen != 8192) {
+        BAD_ARG(env, "wotsAddressV2(Uint8Array of 8192 hex bytes)");
+    }
+    napi_value res = new_buffer(env, 64, &out);
+    if (res == NULL) return NULL;
+    if (kcore_wots_address_v2((const char *)key, (char *)out) != 0) REJECTED(env, "kcore_wots_address_v2");
+    return res;
+}
+
 static napi_value js_mlkem_keypair(napi_env env, napi_callback_info info) {
     size_t argc = 2;
     napi_value argv[2];
@@ -243,6 +259,7 @@ NAPI_MODULE_INIT() {
         {"shake256", NULL, js_shake256, NULL, NULL, NULL, napi_default, NULL},
         {"chainsHex", NULL, js_chains_hex, NULL, NULL, NULL, napi_default, NULL},
         {"wotsAddress", NULL, js_wots_address, NULL, NULL, NULL, napi_default, NULL},
+        {"wotsAddressV2", NULL, js_wots_address_v2, NULL, NULL, NULL, napi_default, NULL},
         {"mlkemKeypair", NULL, js_mlkem_keypair, NULL, NULL, NULL, napi_default, NULL},
         {"mlkemEncaps", NULL, js_mlkem_encaps, NULL, NULL, NULL, napi_default, NULL},
         {"mlkemDecaps", NULL, js_mlkem_decaps, NULL, NULL, NULL, napi_default, NULL},

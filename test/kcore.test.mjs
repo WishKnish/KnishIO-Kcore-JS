@@ -27,7 +27,8 @@ function referenceChains (chunks, counts) {
 }
 
 function referenceAddress (key) {
-  return shakeHex(shakeHex(referenceChains(key, new Array(16).fill(16)), 1024), 32)
+  const chains = key.length / 128
+  return shakeHex(shakeHex(referenceChains(key, new Array(chains).fill(16)), 1024), 32)
 }
 
 // Mirrors the SDKs' Wallet.generateKey. The vectors' expectedPrivateKey is not this key; the wallet
@@ -48,11 +49,11 @@ function assertCode (fn, Ctor, code) {
   assert.throws(fn, (err) => err instanceof Ctor && err.code === code)
 }
 
-test('the expected backend loaded, at ABI 1 and kcore 0.1.0', () => {
+test('the expected backend loaded, at ABI 1 and kcore 0.2.0', () => {
   const expected = process.env.KNISHIO_KCORE_EXPECT_BACKEND
   if (expected) assert.equal(kcore.backend, expected)
   assert.equal(kcore.abiVersion(), 1)
-  assert.equal(kcore.kcoreVersion, '0.1.0')
+  assert.equal(kcore.kcoreVersion, '0.2.0')
 })
 
 test('shake256 matches the cross-SDK vectors', () => {
@@ -80,6 +81,13 @@ test('chainsHex and wotsAddress match an independent node:crypto implementation'
   assert.equal(kcore.chainsHex(one, [3]), referenceChains(one, [3]), 'a single chain')
 })
 
+test('wotsAddressV2 matches an independent node:crypto implementation over 64 chains', () => {
+  for (let i = 0; i < 8; i++) {
+    const key = randomBytes(4096).toString('hex')
+    assert.equal(kcore.wotsAddressV2(key), referenceAddress(key), `address ${i}`)
+  }
+})
+
 for (const set of [1024, 768]) {
   test(`ML-KEM-${set} matches @noble/post-quantum`, () => {
     const noble = NOBLE[set]
@@ -103,6 +111,10 @@ test('invalid arguments throw coded errors', () => {
   const key = 'a'.repeat(2048)
   assertCode(() => kcore.wotsAddress(key.slice(1)), TypeError, 'KCORE_BAD_ARG')
   assertCode(() => kcore.wotsAddress('é'.repeat(2048)), TypeError, 'KCORE_BAD_ARG')
+  assertCode(() => kcore.wotsAddress('a'.repeat(8192)), TypeError, 'KCORE_BAD_ARG')
+  assertCode(() => kcore.wotsAddressV2(key), TypeError, 'KCORE_BAD_ARG')
+  assertCode(() => kcore.wotsAddressV2('é'.repeat(8192)), TypeError, 'KCORE_BAD_ARG')
+  assertCode(() => kcore.wotsAddressV2(`${'a'.repeat(8191)}\0`), Error, 'KCORE_REJECTED')
   assertCode(() => kcore.chainsHex(key.slice(0, 128), [65]), Error, 'KCORE_REJECTED')
   assertCode(() => kcore.chainsHex(key.slice(0, 128), [-1]), Error, 'KCORE_REJECTED')
   assertCode(() => kcore.chainsHex(`${'a'.repeat(127)}\0`, [1]), Error, 'KCORE_REJECTED')

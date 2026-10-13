@@ -6,7 +6,7 @@ export declare const backend: 'napi' | 'wasm'
 /** Absolute path of the loaded kcore.node or kcore.wasm. */
 export declare const libraryPath: string
 /** Version of the bundled kcore C library. */
-export declare const kcoreVersion: '0.1.0'
+export declare const kcoreVersion: '0.2.0'
 /** kcore ABI version (1). */
 export declare function abiVersion (): number
 
@@ -19,6 +19,8 @@ export declare function shake256 (input: Uint8Array, outLen: number): Uint8Array
 export declare function chainsHex (chunks: string, counts: ArrayLike<number>): string
 /** WOTS+ address (64 hex characters) of a 2048-hex-character key. */
 export declare function wotsAddress (key: string): string
+/** WOTS+ address (64 hex characters) of an 8192-hex-character (64-chain) key. */
+export declare function wotsAddressV2 (key: string): string
 
 /** Deterministic ML-KEM keypair from a 64-byte seed (d || z). */
 export declare function mlkemKeypair (set: MlKemSet, seed: Uint8Array): { publicKey: Uint8Array, secretKey: Uint8Array }
@@ -35,6 +37,7 @@ declare const kcore: {
   shake256: typeof shake256
   chainsHex: typeof chainsHex
   wotsAddress: typeof wotsAddress
+  wotsAddressV2: typeof wotsAddressV2
   mlkemKeypair: typeof mlkemKeypair
   mlkemEncaps: typeof mlkemEncaps
   mlkemDecaps: typeof mlkemDecaps

@@ -1,6 +1,6 @@
 # @wishknish/knishio-kcore
 
-Node binding of **kcore** ([KnishIO-Crypto-Core](https://github.com/WishKnish/KnishIO-Crypto-Core) 0.1.0), the shared C crypto core of the KnishIO SDKs: SHAKE256, WOTS+ chains and the WOTS+ address, and ML-KEM-1024 / ML-KEM-768 (FIPS 203, on mlkem-native v1.2.0).
+Node binding of **kcore** ([KnishIO-Crypto-Core](https://github.com/WishKnish/KnishIO-Crypto-Core) 0.2.0), the shared C crypto core of the KnishIO SDKs: SHAKE256, WOTS+ chains and the WOTS+ address, and ML-KEM-1024 / ML-KEM-768 (FIPS 203, on mlkem-native v1.2.0).
 
 The KnishIO JavaScript and TypeScript SDKs list this package as an optional dependency and use it when it loads; without it they run their pure-JS paths with byte-identical results.
 
@@ -21,10 +21,11 @@ const kcore = require('@wishknish/knishio-kcore') // or: import kcore from '@wis
 
 | export | |
 |---|---|
-| `backend`, `libraryPath`, `kcoreVersion`, `abiVersion()` | what loaded; kcore `0.1.0`, ABI `1` |
+| `backend`, `libraryPath`, `kcoreVersion`, `abiVersion()` | what loaded; kcore `0.2.0`, ABI `1` |
 | `shake256(input: Uint8Array, outLen: number): Uint8Array` | SHAKE256, `outLen` 1..1048576 bytes |
 | `chainsHex(chunks: string, counts: number[]): string` | advances `counts.length` WOTS+ chains of 128 hex characters each, `counts[i]` steps (0..64) of `hex(SHAKE256(chunk, 64 bytes))` |
 | `wotsAddress(key: string): string` | WOTS+ address (64 hex) of a 2048-hex key |
+| `wotsAddressV2(key: string): string` | WOTS+ address (64 hex) of an 8192-hex (64-chain) key |
 | `mlkemKeypair(set, seed)` → `{ publicKey, secretKey }` | deterministic keypair from a 64-byte seed |
 | `mlkemEncaps(set, publicKey, coins)` → `{ cipherText, sharedSecret }` | **`coins` must be 32 fresh random bytes on every call**: reusing them against one key repeats the ciphertext and the shared secret |
 | `mlkemDecaps(set, cipherText, secretKey)` → `Uint8Array` | 32-byte shared secret |

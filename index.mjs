@@ -11,6 +11,7 @@ export const {
   shake256,
   chainsHex,
   wotsAddress,
+  wotsAddressV2,
   mlkemKeypair,
   mlkemEncaps,
   mlkemDecaps

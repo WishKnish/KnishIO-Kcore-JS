@@ -1,5 +1,5 @@
 'use strict'
-// @wishknish/knishio-kcore: Node binding of kcore (KnishIO-Crypto-Core 0.1.0).
+// @wishknish/knishio-kcore: Node binding of kcore (KnishIO-Crypto-Core 0.2.0).
 //
 // Two backends with one internal interface and one set of error codes:
 //   napi  prebuilds/<target>/kcore.node, the C library statically linked into a Node-API addon
@@ -13,7 +13,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const ABI_VERSION = 1
-const KCORE_VERSION = '0.1.0'
+const KCORE_VERSION = '0.2.0'
 const SETS = {
   1024: { pk: 1568, sk: 3168, ct: 1568 },
   768: { pk: 1184, sk: 2400, ct: 1088 }
@@ -100,6 +100,11 @@ function loadWasm () {
     wotsAddress (key) {
       const { rc, regions } = call([key], [64], ([k, o]) => ex.kcore_wots_address(k, o))
       if (rc !== 0) throw rejected('kcore_wots_address')
+      return regions[1]
+    },
+    wotsAddressV2 (key) {
+      const { rc, regions } = call([key], [64], ([k, o]) => ex.kcore_wots_address_v2(k, o))
+      if (rc !== 0) throw rejected('kcore_wots_address_v2')
       return regions[1]
     },
     mlkemKeypair (set, seed) {
@@ -193,6 +198,12 @@ function wotsAddress (key) {
   return Buffer.from(impl.wotsAddress(bytes)).toString('latin1')
 }
 
+function wotsAddressV2 (key) {
+  const bytes = ascii(key, 'key')
+  if (bytes.length !== 8192) throw badArg('key must be 8192 hex characters')
+  return Buffer.from(impl.wotsAddressV2(bytes)).toString('latin1')
+}
+
 function mlkemKeypair (set, seed) {
   mlkemSet(set)
   u8(seed, 'seed', SEED)
@@ -223,6 +234,7 @@ module.exports = {
   shake256,
   chainsHex,
   wotsAddress,
+  wotsAddressV2,
   mlkemKeypair,
   mlkemEncaps,
   mlkemDecaps

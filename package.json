@@ -1,6 +1,6 @@
 {
   "name": "@wishknish/knishio-kcore",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node binding of kcore, the KnishIO shared crypto core (SHAKE256, WOTS+, ML-KEM-1024/768): N-API prebuilds with a WebAssembly fallback.",
   "license": "GPL-3.0-or-later",
   "repository": {

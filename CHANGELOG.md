@@ -5,6 +5,16 @@ All notable changes to `@wishknish/knishio-kcore` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-10-13
+
+### Added
+
+- `wotsAddressV2(key)`: the WOTS+ address of a 64-chain (8192-hex) key (kcore 0.2.0).
+
+### Changed
+
+- The bundled kcore is 0.2.0 (ABI version unchanged, 1).
+
 ## [0.1.0] — 2026-10-04
 
 ### Added
@@ -24,4 +34,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CommonJS and ESM entry points and TypeScript declarations. No dependencies, no install scripts.
   mlkem-native's license text ships as `LICENSE-mlkem-native`.
 
+[0.2.0]: https://github.com/WishKnish/KnishIO-Kcore-JS/releases/tag/0.2.0
 [0.1.0]: https://github.com/WishKnish/KnishIO-Kcore-JS/releases/tag/0.1.0
