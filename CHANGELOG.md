@@ -5,6 +5,14 @@ All notable changes to `@wishknish/knishio-kcore` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- CI generates a CycloneDX SBOM listing the KnishIO-Crypto-Core 0.2.0 packages (from
+  `scripts/kcore-pins.json`) built into every addon and `kcore.wasm`, and OSV scans the pinned mlkem-native
+  commit on every push and weekly. Each GitHub Release attaches it as `knishio-kcore-js-<version>.cdx.json`.
+
 ## [0.2.0] — 2026-10-13
 
 ### Added
