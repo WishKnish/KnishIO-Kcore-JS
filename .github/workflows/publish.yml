@@ -25,8 +25,7 @@ on:
         type: string
 
 permissions:
-  id-token: write   # OIDC for npm Trusted Publishing (publish job only; build.yml drops to read)
-  contents: write   # create the GitHub Release
+  contents: read
 
 jobs:
   verify:
@@ -88,6 +87,9 @@ jobs:
     if: github.event_name == 'push'   # dispatch = dry run; never publishes
     runs-on: ubuntu-latest
     environment: release   # matches the npm trusted-publisher Environment + the repo's `release` env
+    permissions:
+      id-token: write   # OIDC for npm Trusted Publishing (this job only; build.yml stays read)
+      contents: write   # create the GitHub Release
     env:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
@@ -152,7 +154,7 @@ jobs:
           path: sbom-out
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3  # v3
         with:
           # generate_release_notes stays OFF: the curated CHANGELOG section is the release body.
           body_path: /tmp/release-notes.md
