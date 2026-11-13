@@ -6,7 +6,7 @@ export declare const backend: 'napi' | 'wasm'
 /** Absolute path of the loaded kcore.node or kcore.wasm. */
 export declare const libraryPath: string
 /** Version of the bundled kcore C library. */
-export declare const kcoreVersion: '0.2.0'
+export declare const kcoreVersion: '0.2.1'
 /** kcore ABI version (1). */
 export declare function abiVersion (): number
 

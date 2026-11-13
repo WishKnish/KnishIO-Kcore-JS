@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-11-12
+
 ### Added
 
-- CI generates a CycloneDX SBOM listing the KnishIO-Crypto-Core 0.2.0 packages (from
+- CI generates a CycloneDX SBOM listing the KnishIO-Crypto-Core packages (from
   `scripts/kcore-pins.json`) built into every addon and `kcore.wasm`, and OSV scans the pinned mlkem-native
   commit on every push and weekly. Each GitHub Release attaches it as `knishio-kcore-js-<version>.cdx.json`.
+
+### Changed
+
+- The bundled kcore is 0.2.1 (ABI version unchanged, 1): every prebuilt addon and `kcore.wasm` is
+  built from the KnishIO-Crypto-Core 0.2.1 packages, which zero ML-KEM secrets, WOTS+ chain preimages
+  and Keccak state on the stack before each call returns. Outputs are unchanged.
 
 ## [0.2.0] — 2026-10-13
 
@@ -42,5 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CommonJS and ESM entry points and TypeScript declarations. No dependencies, no install scripts.
   mlkem-native's license text ships as `LICENSE-mlkem-native`.
 
+[0.2.1]: https://github.com/WishKnish/KnishIO-Kcore-JS/releases/tag/0.2.1
 [0.2.0]: https://github.com/WishKnish/KnishIO-Kcore-JS/releases/tag/0.2.0
 [0.1.0]: https://github.com/WishKnish/KnishIO-Kcore-JS/releases/tag/0.1.0

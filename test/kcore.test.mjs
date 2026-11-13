@@ -49,11 +49,11 @@ function assertCode (fn, Ctor, code) {
   assert.throws(fn, (err) => err instanceof Ctor && err.code === code)
 }
 
-test('the expected backend loaded, at ABI 1 and kcore 0.2.0', () => {
+test('the expected backend loaded, at ABI 1 and kcore 0.2.1', () => {
   const expected = process.env.KNISHIO_KCORE_EXPECT_BACKEND
   if (expected) assert.equal(kcore.backend, expected)
   assert.equal(kcore.abiVersion(), 1)
-  assert.equal(kcore.kcoreVersion, '0.2.0')
+  assert.equal(kcore.kcoreVersion, '0.2.1')
 })
 
 test('shake256 matches the cross-SDK vectors', () => {

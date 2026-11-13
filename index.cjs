@@ -1,5 +1,5 @@
 'use strict'
-// @wishknish/knishio-kcore: Node binding of kcore (KnishIO-Crypto-Core 0.2.0).
+// @wishknish/knishio-kcore: Node binding of kcore (KnishIO-Crypto-Core 0.2.1).
 //
 // Two backends with one internal interface and one set of error codes:
 //   napi  prebuilds/<target>/kcore.node, the C library statically linked into a Node-API addon
@@ -13,7 +13,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const ABI_VERSION = 1
-const KCORE_VERSION = '0.2.0'
+const KCORE_VERSION = '0.2.1'
 const SETS = {
   1024: { pk: 1568, sk: 3168, ct: 1568 },
   768: { pk: 1184, sk: 2400, ct: 1088 }
